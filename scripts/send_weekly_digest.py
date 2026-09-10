@@ -53,7 +53,7 @@ def main():
 
         if args.dry_run:
             output_file = Path("digest.html")
-            with open(output_file, "w") as f:
+            with open(output_file, "w", encoding="utf-8") as f:
                 f.write(html)
             log.info(f"✓ Digest written to {output_file.absolute()}")
             print(f"\nOpen file://{output_file.absolute()} in your browser")
