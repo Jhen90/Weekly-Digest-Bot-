@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test AI Nonprofits</title>
+    <link>https://example.com</link>
+    <description>Test feed</description>
+    <item>
+      <title>New AI tool for nonprofits launches</title>
+      <link>https://example.com/article1</link>
+      <description>A new AI tool to help nonprofits automate grants</description>
+      <pubDate>Mon, 08 Sep 2026 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Machine learning in charities</title>
+      <link>https://example.com/article2</link>
+      <description>How charities use ML for impact</description>
+      <pubDate>Tue, 02 Sep 2026 14:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

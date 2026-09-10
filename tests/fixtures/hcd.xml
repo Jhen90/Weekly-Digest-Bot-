@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test HCD</title>
+    <link>https://example.com</link>
+    <description>Test feed</description>
+    <item>
+      <title>Design thinking in practice</title>
+      <link>https://example.com/dt1</link>
+      <description>How teams apply HCD principles</description>
+      <pubDate>Thu, 04 Sep 2026 11:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Inclusive design case studies</title>
+      <link>https://example.com/dt2</link>
+      <description>Real-world examples of inclusive design</description>
+      <pubDate>Sat, 06 Sep 2026 13:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

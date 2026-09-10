@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test AI News</title>
+    <link>https://example.com</link>
+    <description>Test feed</description>
+    <item>
+      <title>Claude 4 released</title>
+      <link>https://example.com/claude</link>
+      <description>Anthropic releases Claude 4 with new capabilities</description>
+      <pubDate>Wed, 07 Sep 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>GPT-5 update</title>
+      <link>https://example.com/gpt5</link>
+      <description>OpenAI rolls out incremental improvements</description>
+      <pubDate>Fri, 05 Sep 2026 09:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
