@@ -18,7 +18,7 @@ def fetch_feeds(config: Config) -> list[Article]:
         topic_name = topic_config["name"]
         for feed_config in topic_config.get("feeds", []):
             try:
-                feed = feedparser.parse(feed_config["url"], timeout=10)
+                feed = feedparser.parse(feed_config["url"])
                 if not feed.get("entries"):
                     failed_feeds.append((feed_config["name"], "no entries"))
                     continue
