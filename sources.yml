@@ -1,0 +1,60 @@
+topics:
+  ai_nonprofits:
+    name: "AI + Nonprofits"
+    keywords:
+      - nonprofits
+      - philanthropy
+      - charities
+      - social impact
+      - AI adoption
+    feeds:
+      - name: "Stanford Social Innovation Review"
+        url: "https://ssir.org/site/rss_2.0"
+      - name: "Nonprofit Quarterly"
+        url: "https://nonprofitquarterly.org/feed/"
+      - name: "Chronicle of Philanthropy"
+        url: "https://www.philanthropy.com/feed"
+
+  ai_women:
+    name: "AI + Women"
+    keywords:
+      - women in tech
+      - women in AI
+      - gender equity
+      - AI ethics
+      - women founders
+    feeds:
+      - name: "The 19th"
+        url: "https://19thnews.org/feed/"
+      - name: "Wired"
+        url: "https://www.wired.com/feed/rss"
+
+  hcd:
+    name: "Human-Centered Design"
+    keywords:
+      - design thinking
+      - UX
+      - user research
+      - inclusive design
+      - design ethics
+    feeds:
+      - name: "Nielsen Norman Group"
+        url: "https://www.nngroup.com/feed/rss/"
+      - name: "A List Apart"
+        url: "https://alistapart.com/main/feed/"
+
+  ai_news:
+    name: "AI News & Developments"
+    keywords:
+      - AI models
+      - machine learning
+      - large language models
+      - AI releases
+      - AI research
+    feeds:
+      - name: "MIT Technology Review"
+        url: "https://www.technologyreview.com/feed/"
+      - name: "The Verge"
+        url: "https://www.theverge.com/rss/index.xml"
+      - name: "VentureBeat"
+        url: "https://venturebeat.com/category/ai/feed/"

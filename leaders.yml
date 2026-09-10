@@ -1,0 +1,7 @@
+leaders:
+  - name: "Timnit Gebru"
+    feed_url: "https://substack.com/feed/@timnit"
+  - name: "Kate Crawford"
+    feed_url: "https://substack.com/feed/@katecrawford"
+  - name: "Andrew Ng"
+    feed_url: "https://substack.com/feed/@andrewng"
