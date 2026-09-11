@@ -10,7 +10,9 @@ Usage:
 import argparse
 import sys
 import logging
+import os
 from pathlib import Path
+from datetime import datetime
 
 # Add parent to path so we can import src.pulse
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -19,6 +21,7 @@ from src.pulse.config import Config
 from src.pulse.feeds import fetch_feeds
 from src.pulse.topics import filter_and_rank
 from src.pulse.render import render_digest
+from src.pulse.mailer import send_email
 
 logging.basicConfig(
     level=logging.INFO,
@@ -58,7 +61,21 @@ def main():
             log.info(f"✓ Digest written to {output_file.absolute()}")
             print(f"\nOpen file://{output_file.absolute()} in your browser")
         else:
-            log.info("Sending email... (not yet implemented)")
+            log.info("Sending email...")
+            gmail_password = os.getenv("GMAIL_APP_PASSWORD")
+            if not gmail_password:
+                raise ValueError("GMAIL_APP_PASSWORD environment variable not set")
+
+            subject = f"Pulse Digest — {datetime.now().strftime('%Y-%m-%d')}"
+            send_email(
+                html=html,
+                text=text,
+                subject=subject,
+                sender=config.gmail_user,
+                recipient=config.email_to,
+                app_password=gmail_password,
+            )
+            log.info(f"✓ Email sent to {config.email_to}")
 
     except Exception as e:
         log.error(f"Failed: {e}", exc_info=True)
