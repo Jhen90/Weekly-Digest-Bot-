@@ -1,0 +1,130 @@
+diff --git a/leaders.yml b/leaders.yml
+new file mode 100644
+index 0000000..7ca232a
+--- /dev/null
++++ b/leaders.yml
+@@ -0,0 +1,7 @@
++leaders:
++  - name: "Timnit Gebru"
++    feed_url: "https://substack.com/feed/@timnit"
++  - name: "Kate Crawford"
++    feed_url: "https://substack.com/feed/@katecrawford"
++  - name: "Andrew Ng"
++    feed_url: "https://substack.com/feed/@andrewng"
+diff --git a/sources.yml b/sources.yml
+new file mode 100644
+index 0000000..e4c47de
+--- /dev/null
++++ b/sources.yml
+@@ -0,0 +1,60 @@
++topics:
++  ai_nonprofits:
++    name: "AI + Nonprofits"
++    keywords:
++      - nonprofits
++      - philanthropy
++      - charities
++      - social impact
++      - AI adoption
++    feeds:
++      - name: "Stanford Social Innovation Review"
++        url: "https://ssir.org/site/rss_2.0"
++      - name: "Nonprofit Quarterly"
++        url: "https://nonprofitquarterly.org/feed/"
++      - name: "Chronicle of Philanthropy"
++        url: "https://www.philanthropy.com/feed"
++
++  ai_women:
++    name: "AI + Women"
++    keywords:
++      - women in tech
++      - women in AI
++      - gender equity
++      - AI ethics
++      - women founders
++    feeds:
++      - name: "The 19th"
++        url: "https://19thnews.org/feed/"
++      - name: "Wired"
++        url: "https://www.wired.com/feed/rss"
++
++  hcd:
++    name: "Human-Centered Design"
++    keywords:
++      - design thinking
++      - UX
++      - user research
++      - inclusive design
++      - design ethics
++    feeds:
++      - name: "Nielsen Norman Group"
++        url: "https://www.nngroup.com/feed/rss/"
++      - name: "A List Apart"
++        url: "https://alistapart.com/main/feed/"
++
++  ai_news:
++    name: "AI News & Developments"
++    keywords:
++      - AI models
++      - machine learning
++      - large language models
++      - AI releases
++      - AI research
++    feeds:
++      - name: "MIT Technology Review"
++        url: "https://www.technologyreview.com/feed/"
++      - name: "The Verge"
++        url: "https://www.theverge.com/rss/index.xml"
++      - name: "VentureBeat"
++        url: "https://venturebeat.com/category/ai/feed/"
+diff --git a/src/pulse/__init__.py b/src/pulse/__init__.py
+index e69de29..cb0d391 100644
+--- a/src/pulse/__init__.py
++++ b/src/pulse/__init__.py
+@@ -0,0 +1,16 @@
++from dataclasses import dataclass, field
++from datetime import datetime
++from typing import Optional
++
++@dataclass
++class Article:
++    """A news article from an RSS feed."""
++    title: str
++    url: str
++    source_name: str
++    published: datetime
++    feed_summary: str  # fallback summary from the feed
++    topic: Optional[str] = None
++    score: float = 0.0
++    full_text: Optional[str] = None
++    summary: Optional[str] = None
+diff --git a/src/pulse/config.py b/src/pulse/config.py
+new file mode 100644
+index 0000000..e5f1676
+--- /dev/null
++++ b/src/pulse/config.py
+@@ -0,0 +1,24 @@
++import os
++from pathlib import Path
++from typing import Optional
++import yaml
++from . import Article
++
++class Config:
++    def __init__(self):
++        self.project_root = Path(__file__).parent.parent.parent
++        self.sources = self._load_yaml("sources.yml")
++        self.leaders = self._load_yaml("leaders.yml")
++        self.anthropic_key: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
++        self.gmail_user = "dojoatsomernova@gmail.com"  # hardcoded; overridden in workflow
++        self.email_to = "jhenny.saintsurin@outlook.com"  # hardcoded; overridden in workflow
++
++    def _load_yaml(self, filename: str) -> dict:
++        path = self.project_root / filename
++        if not path.exists():
++            raise FileNotFoundError(f"Config file not found: {path}")
++        with open(path) as f:
++            data = yaml.safe_load(f)
++        if not data:
++            raise ValueError(f"Empty config file: {path}")
++        return data

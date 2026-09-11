@@ -24,12 +24,21 @@ def fetch_feeds(config: Config) -> list[Article]:
                     continue
 
                 for entry in feed.entries:
-                    # Parse publication date
-                    try:
-                        pub_date = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
-                    except (AttributeError, TypeError):
-                        log.warning(f"Skipping {getattr(entry, 'title', 'unknown')}: no pubDate")
-                        continue
+                    # Parse publication date — try normalized feedparser fields in order
+                    pub_date = None
+                    for field in ['published_parsed', 'updated_parsed', 'created_parsed']:
+                        try:
+                            parsed = getattr(entry, field, None)
+                            if parsed:
+                                pub_date = datetime(*parsed[:6], tzinfo=timezone.utc)
+                                break
+                        except (AttributeError, TypeError, ValueError):
+                            continue
+
+                    # If no date found, use today (keep article, log at INFO)
+                    if pub_date is None:
+                        pub_date = now
+                        log.info(f"No date found for '{getattr(entry, 'title', 'unknown')}' — using today's date")
 
                     # Filter to 7-day window
                     if pub_date < window_start:

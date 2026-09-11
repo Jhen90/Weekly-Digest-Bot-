@@ -65,7 +65,7 @@ def test_fetch_feeds_filters_7_day_window(config_with_fixtures):
         assert articles[0].title == "Recent article"
 
 def test_fetch_feeds_handles_missing_pubdate(config_with_fixtures):
-    """Test that articles without pubDate are skipped."""
+    """Test that articles without pubDate are kept with today's date as fallback."""
     with patch("src.pulse.feeds.feedparser.parse") as mock_parse:
         mock_feed = MagicMock()
         mock_feed.entries = [
@@ -80,10 +80,17 @@ def test_fetch_feeds_handles_missing_pubdate(config_with_fixtures):
                 link="https://example.com/2",
                 summary="Bad",
                 published_parsed=None,
+                updated_parsed=None,
+                created_parsed=None,
             )
         ]
         mock_parse.return_value = mock_feed
 
         articles = fetch_feeds(config_with_fixtures)
-        assert len(articles) == 1
+        assert len(articles) == 2
         assert articles[0].title == "Article with date"
+        assert articles[1].title == "Article without date"
+        # Article without date should have today's date
+        from datetime import datetime, timezone
+        today = datetime.now(timezone.utc).date()
+        assert articles[1].published.date() == today

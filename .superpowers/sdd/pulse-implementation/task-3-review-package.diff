@@ -1,0 +1,257 @@
+diff --git a/src/pulse/feeds.py b/src/pulse/feeds.py
+new file mode 100644
+index 0000000..8fd8093
+--- /dev/null
++++ b/src/pulse/feeds.py
+@@ -0,0 +1,52 @@
++from datetime import datetime, timedelta, timezone
++import feedparser
++from . import Article
++from .config import Config
++import logging
++
++log = logging.getLogger(__name__)
++
++def fetch_feeds(config: Config) -> list[Article]:
++    """Fetch articles from all configured feeds."""
++    articles = []
++    failed_feeds = []
++    now = datetime.now(timezone.utc)
++    feedparser.USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
++    window_start = now - timedelta(days=7)
++
++    for topic_key, topic_config in config.sources.get("topics", {}).items():
++        topic_name = topic_config["name"]
++        for feed_config in topic_config.get("feeds", []):
++            try:
++                feed = feedparser.parse(feed_config["url"], timeout=10)
++                if not feed.get("entries"):
++                    failed_feeds.append((feed_config["name"], "no entries"))
++                    continue
++
++                for entry in feed.entries:
++                    # Parse publication date
++                    try:
++                        pub_date = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
++                    except (AttributeError, TypeError):
++                        log.warning(f"Skipping {getattr(entry, 'title', 'unknown')}: no pubDate")
++                        continue
++
++                    # Filter to 7-day window
++                    if pub_date < window_start:
++                        continue
++
++                    article = Article(
++                        title=getattr(entry, "title", "(no title)"),
++                        url=getattr(entry, "link", ""),
++                        source_name=feed_config["name"],
++                        published=pub_date,
++                        feed_summary=getattr(entry, "summary", ""),
++                    )
++                    articles.append(article)
++            except Exception as e:
++                failed_feeds.append((feed_config["name"], str(e)))
++                log.error(f"Failed to fetch {feed_config['name']}: {e}")
++
++    # Store failed feeds for later reporting
++    config._failed_feeds = failed_feeds
++    return articles
+diff --git a/tests/fixtures/ai_news.xml b/tests/fixtures/ai_news.xml
+new file mode 100644
+index 0000000..121515f
+--- /dev/null
++++ b/tests/fixtures/ai_news.xml
+@@ -0,0 +1,20 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<rss version="2.0">
++  <channel>
++    <title>Test AI News</title>
++    <link>https://example.com</link>
++    <description>Test feed</description>
++    <item>
++      <title>Claude 4 released</title>
++      <link>https://example.com/claude</link>
++      <description>Anthropic releases Claude 4 with new capabilities</description>
++      <pubDate>Wed, 07 Sep 2026 12:00:00 GMT</pubDate>
++    </item>
++    <item>
++      <title>GPT-5 update</title>
++      <link>https://example.com/gpt5</link>
++      <description>OpenAI rolls out incremental improvements</description>
++      <pubDate>Fri, 05 Sep 2026 09:00:00 GMT</pubDate>
++    </item>
++  </channel>
++</rss>
+diff --git a/tests/fixtures/ai_nonprofits.xml b/tests/fixtures/ai_nonprofits.xml
+new file mode 100644
+index 0000000..1256c6a
+--- /dev/null
++++ b/tests/fixtures/ai_nonprofits.xml
+@@ -0,0 +1,20 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<rss version="2.0">
++  <channel>
++    <title>Test AI Nonprofits</title>
++    <link>https://example.com</link>
++    <description>Test feed</description>
++    <item>
++      <title>New AI tool for nonprofits launches</title>
++      <link>https://example.com/article1</link>
++      <description>A new AI tool to help nonprofits automate grants</description>
++      <pubDate>Mon, 08 Sep 2026 10:00:00 GMT</pubDate>
++    </item>
++    <item>
++      <title>Machine learning in charities</title>
++      <link>https://example.com/article2</link>
++      <description>How charities use ML for impact</description>
++      <pubDate>Tue, 02 Sep 2026 14:00:00 GMT</pubDate>
++    </item>
++  </channel>
++</rss>
+diff --git a/tests/fixtures/ai_women.xml b/tests/fixtures/ai_women.xml
+new file mode 100644
+index 0000000..d4d370d
+--- /dev/null
++++ b/tests/fixtures/ai_women.xml
+@@ -0,0 +1,20 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<rss version="2.0">
++  <channel>
++    <title>Test AI Women</title>
++    <link>https://example.com</link>
++    <description>Test feed</description>
++    <item>
++      <title>Women founders in AI</title>
++      <link>https://example.com/women1</link>
++      <description>Spotlight on women-led AI startups</description>
++      <pubDate>Sun, 08 Sep 2026 15:00:00 GMT</pubDate>
++    </item>
++    <item>
++      <title>Closing the gender gap in AI research</title>
++      <link>https://example.com/women2</link>
++      <description>New initiatives to support women in AI research</description>
++      <pubDate>Thu, 04 Sep 2026 08:00:00 GMT</pubDate>
++    </item>
++  </channel>
++</rss>
+diff --git a/tests/fixtures/hcd.xml b/tests/fixtures/hcd.xml
+new file mode 100644
+index 0000000..6bff580
+--- /dev/null
++++ b/tests/fixtures/hcd.xml
+@@ -0,0 +1,20 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<rss version="2.0">
++  <channel>
++    <title>Test HCD</title>
++    <link>https://example.com</link>
++    <description>Test feed</description>
++    <item>
++      <title>Design thinking in practice</title>
++      <link>https://example.com/dt1</link>
++      <description>How teams apply HCD principles</description>
++      <pubDate>Thu, 04 Sep 2026 11:00:00 GMT</pubDate>
++    </item>
++    <item>
++      <title>Inclusive design case studies</title>
++      <link>https://example.com/dt2</link>
++      <description>Real-world examples of inclusive design</description>
++      <pubDate>Sat, 06 Sep 2026 13:00:00 GMT</pubDate>
++    </item>
++  </channel>
++</rss>
+diff --git a/tests/test_feeds.py b/tests/test_feeds.py
+new file mode 100644
+index 0000000..ea30300
+--- /dev/null
++++ b/tests/test_feeds.py
+@@ -0,0 +1,89 @@
++import pytest
++from pathlib import Path
++from datetime import datetime, timezone
++from src.pulse.feeds import fetch_feeds
++from src.pulse.config import Config
++from unittest.mock import patch, MagicMock
++
++@pytest.fixture
++def config_with_fixtures(tmp_path):
++    """Mock config pointing to local fixture files."""
++    config = MagicMock()
++    config.sources = {
++        "topics": {
++            "ai_nonprofits": {
++                "name": "AI + Nonprofits",
++                "feeds": [
++                    {"name": "Test Nonprofits", "url": "file://" + str(Path("tests/fixtures/ai_nonprofits.xml").absolute())}
++                ]
++            }
++        }
++    }
++    return config
++
++def test_fetch_feeds_parses_entries(config_with_fixtures):
++    """Test that feeds are parsed and articles created."""
++    with patch("src.pulse.feeds.feedparser.parse") as mock_parse:
++        mock_feed = MagicMock()
++        mock_feed.entries = [
++            MagicMock(
++                title="AI for nonprofits",
++                link="https://example.com/1",
++                summary="A story",
++                published_parsed=(2026, 9, 8, 10, 0, 0, 0, 0, 0),
++            )
++        ]
++        mock_parse.return_value = mock_feed
++
++        articles = fetch_feeds(config_with_fixtures)
++        assert len(articles) == 1
++        assert articles[0].title == "AI for nonprofits"
++        assert articles[0].source_name == "Test Nonprofits"
++
++def test_fetch_feeds_filters_7_day_window(config_with_fixtures):
++    """Test that only articles from the last 7 days are kept."""
++    with patch("src.pulse.feeds.feedparser.parse") as mock_parse:
++        mock_feed = MagicMock()
++        mock_feed.entries = [
++            MagicMock(
++                title="Recent article",
++                link="https://example.com/recent",
++                summary="New",
++                published_parsed=(2026, 9, 8, 10, 0, 0, 0, 0, 0),  # today
++            ),
++            MagicMock(
++                title="Old article",
++                link="https://example.com/old",
++                summary="Old",
++                published_parsed=(2026, 8, 25, 10, 0, 0, 0, 0, 0),  # 14 days ago
++            )
++        ]
++        mock_parse.return_value = mock_feed
++
++        articles = fetch_feeds(config_with_fixtures)
++        assert len(articles) == 1
++        assert articles[0].title == "Recent article"
++
++def test_fetch_feeds_handles_missing_pubdate(config_with_fixtures):
++    """Test that articles without pubDate are skipped."""
++    with patch("src.pulse.feeds.feedparser.parse") as mock_parse:
++        mock_feed = MagicMock()
++        mock_feed.entries = [
++            MagicMock(
++                title="Article with date",
++                link="https://example.com/1",
++                summary="Good",
++                published_parsed=(2026, 9, 8, 10, 0, 0, 0, 0, 0),
++            ),
++            MagicMock(
++                title="Article without date",
++                link="https://example.com/2",
++                summary="Bad",
++                published_parsed=None,
++            )
++        ]
++        mock_parse.return_value = mock_feed
++
++        articles = fetch_feeds(config_with_fixtures)
++        assert len(articles) == 1
++        assert articles[0].title == "Article with date"

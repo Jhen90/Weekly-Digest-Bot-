@@ -1,0 +1,445 @@
+diff --git a/src/pulse/render.py b/src/pulse/render.py
+new file mode 100644
+index 0000000..b6bf709
+--- /dev/null
++++ b/src/pulse/render.py
+@@ -0,0 +1,135 @@
++from typing import Dict, List, Tuple
++from datetime import datetime
++from . import Article
++
++def render_digest(
++    articles_by_topic: Dict[str, List[Article]],
++    failed_feeds: List[Tuple[str, str]] = None,
++) -> Tuple[str, str]:
++    """Render the digest as HTML and plaintext."""
++    if failed_feeds is None:
++        failed_feeds = []
++
++    html = _render_html(articles_by_topic, failed_feeds)
++    text = _render_plaintext(articles_by_topic, failed_feeds)
++    return html, text
++
++def _render_html(articles_by_topic: Dict[str, List[Article]], failed_feeds: List) -> str:
++    """Render HTML email."""
++    today = datetime.now().strftime("%Y-%m-%d")
++    html_parts = [
++        f"""<html>
++<head>
++  <meta charset="UTF-8">
++  <meta name="viewport" content="width=device-width, initial-scale=1">
++</head>
++<body style="font-family: Arial, Helvetica, sans-serif; color: #222; max-width: 600px; margin: 0 auto; padding: 20px;">
++
++<h1 style="margin-top: 0; border-bottom: 2px solid #007bff; padding-bottom: 10px;">
++  Pulse — Weekly Digest
++</h1>
++
++<p style="color: #666; font-size: 14px;">
++  {today} | Your weekly news on AI, design, and impact
++</p>
++"""
++    ]
++
++    # Check if empty
++    total_articles = sum(len(articles) for articles in articles_by_topic.values())
++    if total_articles == 0:
++        html_parts.append("""
++<div style="background: #f0f8ff; border-left: 4px solid #007bff; padding: 15px; margin: 20px 0;">
++  <p style="margin: 0;">
++    <strong>No new articles this week.</strong> The bot ran successfully and found nothing
++    matching your topics. Check back next week!
++  </p>
++</div>
++""")
++    else:
++        # Render articles by topic
++        for topic_name, articles in articles_by_topic.items():
++            if articles:
++                html_parts.append(f"""
++<h2 style="margin-top: 30px; margin-bottom: 15px; color: #007bff;">
++  {topic_name}
++</h2>
++""")
++                for article in articles:
++                    html_parts.append(f"""
++<div style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #ddd;">
++  <h3 style="margin: 0 0 5px 0; font-size: 18px;">
++    <a href="{article.url}" style="color: #007bff; text-decoration: none;">{article.title}</a>
++  </h3>
++  <p style="margin: 5px 0; font-size: 12px; color: #666;">
++    {article.source_name} · {article.published.strftime("%b %d, %Y")}
++  </p>
++  <p style="margin: 10px 0; font-size: 14px; line-height: 1.6;">
++    {article.summary or article.feed_summary}
++  </p>
++  <a href="{article.url}" style="color: #007bff; font-size: 12px; text-decoration: none;">
++    Read more →
++  </a>
++</div>
++""")
++
++    # Leaders section (if articles exist)
++    if total_articles > 0:
++        html_parts.append("""
++<h2 style="margin-top: 40px; margin-bottom: 15px; color: #007bff;">
++  What the Leaders Are Saying
++</h2>
++<p style="font-size: 14px; color: #666;">
++  (Coming soon in a future update)
++</p>
++""")
++
++    # Failed feeds footer
++    if failed_feeds:
++        html_parts.append("""
++<hr style="margin-top: 40px; border: none; border-top: 1px solid #ddd;">
++<p style="font-size: 12px; color: #999; margin-top: 20px;">
++  <strong>Note:</strong> The following feeds failed to load this week:
++</p>
++<ul style="font-size: 12px; color: #999; margin: 10px 0;">
++""")
++        for feed_name, error in failed_feeds:
++            html_parts.append(f"<li>{feed_name}: {error}</li>")
++        html_parts.append("</ul>")
++
++    html_parts.append("</body></html>")
++    return "\n".join(html_parts)
++
++def _render_plaintext(articles_by_topic: Dict[str, List[Article]], failed_feeds: List) -> str:
++    """Render plaintext email."""
++    today = datetime.now().strftime("%Y-%m-%d")
++    text_parts = [
++        f"Pulse — Weekly Digest\n{today}\n\n",
++    ]
++
++    total_articles = sum(len(articles) for articles in articles_by_topic.values())
++    if total_articles == 0:
++        text_parts.append(
++            "No new articles this week. The bot ran successfully and found nothing\n"
++            "matching your topics. Check back next week!\n"
++        )
++    else:
++        for topic_name, articles in articles_by_topic.items():
++            if articles:
++                text_parts.append(f"\n{topic_name}\n{'='*len(topic_name)}\n\n")
++                for article in articles:
++                    text_parts.append(
++                        f"{article.title}\n"
++                        f"{article.source_name} · {article.published.strftime('%b %d, %Y')}\n"
++                        f"{article.url}\n\n"
++                        f"{article.summary or article.feed_summary}\n\n"
++                    )
++
++    if failed_feeds:
++        text_parts.append(
++            "\n---\nNote: The following feeds failed to load this week:\n"
++        )
++        for feed_name, error in failed_feeds:
++            text_parts.append(f"  • {feed_name}: {error}\n")
++
++    return "".join(text_parts)
+diff --git a/src/pulse/topics.py b/src/pulse/topics.py
+new file mode 100644
+index 0000000..d0db790
+--- /dev/null
++++ b/src/pulse/topics.py
+@@ -0,0 +1,108 @@
++from typing import Dict, List
++from urllib.parse import urlparse, parse_qs
++from difflib import SequenceMatcher
++import re
++from . import Article
++from .config import Config
++
++def normalize_url(url: str) -> str:
++    """Remove query strings and fragments for deduplication."""
++    parsed = urlparse(url)
++    return f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
++
++def similarity(a: str, b: str) -> float:
++    """Compute headline similarity (0-1)."""
++    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
++
++def score_article(article: Article, topic_keywords: List[str], is_home_topic: bool) -> float:
++    """Score an article for a specific topic."""
++    score = 100.0 if is_home_topic else 0.0  # base score for home topic
++
++    keywords_lower = [kw.lower() for kw in topic_keywords]
++    text = f"{article.title} {article.feed_summary}".lower()
++
++    # Headline keywords: 3 points each
++    for kw in keywords_lower:
++        if kw in article.title.lower():
++            score += 3.0
++
++    # Summary keywords: 1 point each
++    for kw in keywords_lower:
++        if kw in article.feed_summary.lower():
++            score += 1.0
++
++    return score
++
++def filter_and_rank(articles: List[Article], config: Config) -> Dict[str, List[Article]]:
++    """
++    Filter and rank articles by topic.
++    Returns dict of topic names to sorted article lists (max 5 each).
++    """
++    result = {}
++    topics_config = config.sources.get("topics", {})
++
++    # Initialize result dict
++    for topic_key, topic_data in topics_config.items():
++        result[topic_data["name"]] = []
++
++    # Score each article for each topic
++    for article in articles:
++        scored = {}
++        for topic_key, topic_data in topics_config.items():
++            topic_name = topic_data["name"]
++            keywords = topic_data.get("keywords", [])
++
++            # Find if this article's feed is a home topic for this topic
++            is_home = False
++            for feed in topic_data.get("feeds", []):
++                if feed["name"] == article.source_name:
++                    is_home = True
++                    break
++
++            score = score_article(article, keywords, is_home)
++            scored[topic_name] = score
++
++        # Assign to highest-scoring topic
++        if scored:
++            best_topic = max(scored, key=scored.get)
++            article.topic = best_topic
++            article.score = scored[best_topic]
++
++    # Deduplicate by URL and headline
++    for topic_name in result:
++        seen_urls = set()
++        seen_headlines = set()
++        deduped = []
++
++        for article in articles:
++            if article.topic != topic_name:
++                continue
++
++            norm_url = normalize_url(article.url)
++            if norm_url in seen_urls:
++                continue
++
++            # Check headline similarity
++            is_duplicate = False
++            for seen_headline in seen_headlines:
++                if similarity(article.title, seen_headline) > 0.8:
++                    is_duplicate = True
++                    break
++
++            if is_duplicate:
++                continue
++
++            seen_urls.add(norm_url)
++            seen_headlines.add(article.title)
++            deduped.append(article)
++
++        # Sort by score (desc) then by date (desc)
++        deduped.sort(key=lambda a: (-a.score, -a.published.timestamp()))
++
++        # Apply relevance floor (min score 1.0 to keep)
++        filtered = [a for a in deduped if a.score >= 1.0]
++
++        # Cap at 5 per topic
++        result[topic_name] = filtered[:5]
++
++    return result
+diff --git a/tests/test_render.py b/tests/test_render.py
+new file mode 100644
+index 0000000..55c8978
+--- /dev/null
++++ b/tests/test_render.py
+@@ -0,0 +1,54 @@
++import pytest
++from datetime import datetime, timezone
++from src.pulse import Article
++from src.pulse.render import render_digest
++
++@pytest.fixture
++def sample_digest():
++    articles = {
++        "AI + Nonprofits": [
++            Article(
++                title="Nonprofit AI tool launches",
++                url="https://example.com/1",
++                source_name="SSIR",
++                published=datetime(2026, 9, 8, 10, 0, 0, tzinfo=timezone.utc),
++                feed_summary="A new tool",
++                topic="AI + Nonprofits",
++                score=50.0,
++                summary="The upshot: nonprofits now have access to AI.",
++            )
++        ],
++        "AI + Women": [],
++        "Human-Centered Design": [],
++        "AI News & Developments": [],
++    }
++    return articles
++
++def test_render_digest_returns_html_and_text(sample_digest):
++    html, text = render_digest(sample_digest)
++    assert isinstance(html, str)
++    assert isinstance(text, str)
++    assert "<html>" in html
++    assert "Pulse" in text
++
++def test_render_digest_includes_article_title(sample_digest):
++    html, text = render_digest(sample_digest)
++    assert "Nonprofit AI tool launches" in html
++    assert "Nonprofit AI tool launches" in text
++
++def test_render_digest_empty_shows_no_articles_message(sample_digest):
++    empty_digest = {
++        "AI + Nonprofits": [],
++        "AI + Women": [],
++        "Human-Centered Design": [],
++        "AI News & Developments": [],
++    }
++    html, text = render_digest(empty_digest)
++    assert "No new articles this week" in html
++    assert "No new articles this week" in text
++
++def test_render_digest_with_failed_feeds(sample_digest):
++    failed_feeds = [("Example Feed", "timeout")]
++    html, text = render_digest(sample_digest, failed_feeds)
++    assert "Example Feed" in html
++    assert "Example Feed" in text
+diff --git a/tests/test_topics.py b/tests/test_topics.py
+new file mode 100644
+index 0000000..9fc527f
+--- /dev/null
++++ b/tests/test_topics.py
+@@ -0,0 +1,124 @@
++import pytest
++from datetime import datetime, timezone, timedelta
++from src.pulse import Article
++from src.pulse.topics import filter_and_rank, normalize_url, similarity
++from unittest.mock import MagicMock
++
++@pytest.fixture
++def sample_articles():
++    """Create test articles."""
++    return [
++        Article(
++            title="New AI tool for nonprofits",
++            url="https://example.com/article1",
++            source_name="Stanford Social Innovation Review",
++            published=datetime.now(timezone.utc),
++            feed_summary="A new nonprofit AI tool",
++            topic=None,
++            score=0.0,
++        ),
++        Article(
++            title="Women in AI breaking barriers",
++            url="https://example.com/article2",
++            source_name="The 19th",
++            published=datetime.now(timezone.utc) - timedelta(hours=1),
++            feed_summary="Women leaders in artificial intelligence",
++            topic=None,
++            score=0.0,
++        ),
++        Article(
++            title="Design thinking for user experience",
++            url="https://example.com/article3",
++            source_name="Nielsen Norman Group",
++            published=datetime.now(timezone.utc) - timedelta(hours=2),
++            feed_summary="How to apply design thinking principles",
++            topic=None,
++            score=0.0,
++        ),
++    ]
++
++@pytest.fixture
++def mock_config():
++    config = MagicMock()
++    config.sources = {
++        "topics": {
++            "ai_nonprofits": {
++                "name": "AI + Nonprofits",
++                "keywords": ["nonprofits", "philanthropy", "charities"],
++                "feeds": [{"name": "Stanford Social Innovation Review"}],
++            },
++            "ai_women": {
++                "name": "AI + Women",
++                "keywords": ["women", "female", "gender", "equity"],
++                "feeds": [{"name": "The 19th"}],
++            },
++            "hcd": {
++                "name": "Human-Centered Design",
++                "keywords": ["design", "ux", "user research"],
++                "feeds": [{"name": "Nielsen Norman Group"}],
++            },
++        }
++    }
++    return config
++
++def test_filter_and_rank_assigns_topics(sample_articles, mock_config):
++    """Test that articles are assigned to topics."""
++    result = filter_and_rank(sample_articles, mock_config)
++    assert "AI + Nonprofits" in result
++    assert "AI + Women" in result
++    assert len(result["AI + Nonprofits"]) == 1
++    assert result["AI + Nonprofits"][0].title == "New AI tool for nonprofits"
++
++def test_filter_and_rank_respects_5_article_cap(sample_articles, mock_config):
++    """Test that at most 5 articles per topic are kept."""
++    # Add more articles to the same topic
++    for i in range(10):
++        sample_articles.append(
++            Article(
++                title=f"AI nonprofit article {i}",
++                url=f"https://example.com/nonprofit{i}",
++                source_name="Stanford Social Innovation Review",
++                published=datetime.now(timezone.utc) - timedelta(hours=i),
++                feed_summary="nonprofit related",
++                topic=None,
++                score=0.0,
++            )
++        )
++    result = filter_and_rank(sample_articles, mock_config)
++    assert len(result["AI + Nonprofits"]) <= 5
++
++def test_normalize_url_removes_query_strings():
++    """Test URL normalization."""
++    url1 = "https://example.com/article?utm_source=feed&id=123"
++    url2 = "https://example.com/article"
++    assert normalize_url(url1) == normalize_url(url2)
++
++def test_similarity_detects_identical_headlines():
++    """Test headline similarity."""
++    assert similarity("AI tool for nonprofits", "AI tool for nonprofits") > 0.95
++    assert similarity("AI tool", "Machine learning") < 0.5
++
++def test_filter_deduplicates_by_url(mock_config):
++    """Test that duplicate URLs are removed."""
++    articles = [
++        Article(
++            title="Same article",
++            url="https://example.com/same",
++            source_name="Stanford Social Innovation Review",
++            published=datetime.now(timezone.utc),
++            feed_summary="nonprofit",
++            topic=None,
++            score=0.0,
++        ),
++        Article(
++            title="Same article",
++            url="https://example.com/same?ref=twitter",  # same after normalization
++            source_name="Stanford Social Innovation Review",
++            published=datetime.now(timezone.utc),
++            feed_summary="nonprofit",
++            topic=None,
++            score=0.0,
++        ),
++    ]
++    result = filter_and_rank(articles, mock_config)
++    assert len(result["AI + Nonprofits"]) == 1
